@@ -25,50 +25,52 @@ ALTER TABLE network_edge_index DROP COLUMN IF EXISTS {{ column_index_tf | sqlsaf
 DROP TABLE IF EXISTS network_edge_index_tmp;
 CREATE TABLE network_edge_index_tmp AS (
     SELECT a.*,
-           calculate_index(
-               b.bicycle_infrastructure_ft, {{ bicycle_infrastructure }},
-               b.pedestrian_infrastructure_ft, {{ pedestrian_infrastructure }},
-               b.designated_route_ft, {{ designated_route }},
-               b.road_category, {{ road_category_bicycle }},
-               b.road_category, {{ road_category_pedestrian }},
-               b.max_speed_ft, {{ max_speed_bicycle }},
-               greatest(b.max_speed_ft, b.max_speed_tf), {{ max_speed_pedestrian }},
-               b.parking_ft, {{ parking }},
-               b.pavement, {{ pavement }},
-               b.width, {{ width }},
-               b.gradient_ft, {{ gradient_bicycle }},
-               b.gradient_ft, {{ gradient_pedestrian }},
-               b.number_lanes_ft, {{ number_lanes }},
-               b.facilities, {{ facilities }},
-               b.crossings, {{ crossings }},
-               b.buildings, {{ buildings }},
-               b.greenness, {{ greenness }},
-               b.water, {{ water }},
-               b.noise, {{ noise }}
-           ) AS {{ column_index_ft | sqlsafe }},
-           calculate_index(
-               b.bicycle_infrastructure_tf, {{ bicycle_infrastructure }},
-               b.pedestrian_infrastructure_tf, {{ pedestrian_infrastructure }},
-               b.designated_route_tf, {{ designated_route }},
-               b.road_category, {{ road_category_bicycle }},
-               b.road_category, {{ road_category_pedestrian }},
-               b.max_speed_tf, {{ max_speed_bicycle }},
-               greatest(b.max_speed_ft, b.max_speed_tf), {{ max_speed_pedestrian }},
-               b.parking_tf, {{ parking }},
-               b.pavement, {{ pavement }},
-               b.width, {{ width }},
-               b.gradient_tf, {{ gradient_bicycle }},
-               b.gradient_tf, {{ gradient_pedestrian }},
-               b.number_lanes_tf, {{ number_lanes }},
-               b.facilities, {{ facilities }},
-               b.crossings, {{ crossings }},
-               b.buildings, {{ buildings }},
-               b.greenness, {{ greenness }},
-               b.water, {{ water }},
-               b.noise, {{ noise }}
-           ) AS {{ column_index_tf | sqlsafe }}
+           ft.index AS {{ column_index_ft | sqlsafe }},
+           tf.index AS {{ column_index_tf | sqlsafe }}
     FROM network_edge_index a
-        JOIN network_edge_attributes b USING (edge_id)
+        JOIN network_edge_attributes b USING (edge_id),
+        LATERAL calculate_index(
+            b.bicycle_infrastructure_ft, {{ bicycle_infrastructure }},
+            b.pedestrian_infrastructure_ft, {{ pedestrian_infrastructure }},
+            b.designated_route_ft, {{ designated_route }},
+            b.road_category, {{ road_category_bicycle }},
+            b.road_category, {{ road_category_pedestrian }},
+            b.max_speed_ft, {{ max_speed_bicycle }},
+            greatest(b.max_speed_ft, b.max_speed_tf), {{ max_speed_pedestrian }},
+            b.parking_ft, {{ parking }},
+            b.pavement, {{ pavement }},
+            b.width, {{ width }},
+            b.gradient_ft, {{ gradient_bicycle }},
+            b.gradient_ft, {{ gradient_pedestrian }},
+            b.number_lanes_ft, {{ number_lanes }},
+            b.facilities, {{ facilities }},
+            b.crossings, {{ crossings }},
+            b.buildings, {{ buildings }},
+            b.greenness, {{ greenness }},
+            b.water, {{ water }},
+            b.noise, {{ noise }}
+        ) ft,
+        LATERAL calculate_index(
+            b.bicycle_infrastructure_tf, {{ bicycle_infrastructure }},
+            b.pedestrian_infrastructure_tf, {{ pedestrian_infrastructure }},
+            b.designated_route_tf, {{ designated_route }},
+            b.road_category, {{ road_category_bicycle }},
+            b.road_category, {{ road_category_pedestrian }},
+            b.max_speed_tf, {{ max_speed_bicycle }},
+            greatest(b.max_speed_ft, b.max_speed_tf), {{ max_speed_pedestrian }},
+            b.parking_tf, {{ parking }},
+            b.pavement, {{ pavement }},
+            b.width, {{ width }},
+            b.gradient_tf, {{ gradient_bicycle }},
+            b.gradient_tf, {{ gradient_pedestrian }},
+            b.number_lanes_tf, {{ number_lanes }},
+            b.facilities, {{ facilities }},
+            b.crossings, {{ crossings }},
+            b.buildings, {{ buildings }},
+            b.greenness, {{ greenness }},
+            b.water, {{ water }},
+            b.noise, {{ noise }}
+        ) tf
     WHERE b.access_car_tow OR b.access_car_bkw OR
           b.access_bicycle_tow OR b.access_bicycle_bkw OR
           b.access_pedestrian_tow OR b.access_pedestrian_bkw
@@ -77,4 +79,4 @@ CREATE TABLE network_edge_index_tmp AS (
 DROP TABLE network_edge_index;
 ALTER TABLE network_edge_index_tmp RENAME TO network_edge_index;
 
-ALTER TABLE network_edge_index ADD PRIMARY KEY (edge_id);
+--ALTER TABLE network_edge_index ADD PRIMARY KEY (edge_id);

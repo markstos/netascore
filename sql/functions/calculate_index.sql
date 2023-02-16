@@ -1,31 +1,43 @@
+DROP TYPE IF EXISTS indicators_rating CASCADE;
+CREATE TYPE indicators_rating AS (
+    indicator varchar,
+    weight numeric
+);
+
 CREATE OR REPLACE FUNCTION calculate_index(
-    bicycle_infrastructure varchar, bicycle_infrastructure_weight numeric,
-    pedestrian_infrastructure varchar, pedestrian_infrastructure_weight numeric,
-    designated_route varchar, designated_route_weight numeric,
-    road_category_bicycle varchar, road_category_bicycle_weight numeric,
-    road_category_pedestrian varchar, road_category_pedestrian_weight numeric,
-    max_speed_bicycle numeric, max_speed_bicycle_weight numeric,
-    max_speed_pedestrian numeric, max_speed_pedestrian_weight numeric,
-    parking varchar, parking_weight numeric,
-    pavement varchar, pavement_weight numeric,
-    width numeric, width_weight numeric,
-    gradient_bicycle numeric, gradient_bicycle_weight numeric,
-    gradient_pedestrian numeric, gradient_pedestrian_weight numeric,
-    number_lanes numeric, number_lanes_weight numeric,
-    facilities numeric, facilities_weight numeric,
-    crossings numeric, crossings_weight numeric,
-    buildings numeric, buildings_weight numeric,
-    greenness numeric, greenness_weight numeric,
-    water boolean, water_weight numeric,
-    noise numeric, noise_weight numeric
+    IN bicycle_infrastructure varchar, IN bicycle_infrastructure_weight numeric,
+    IN pedestrian_infrastructure varchar, IN pedestrian_infrastructure_weight numeric,
+    IN designated_route varchar, IN designated_route_weight numeric,
+    IN road_category_bicycle varchar, IN road_category_bicycle_weight numeric,
+    IN road_category_pedestrian varchar, IN road_category_pedestrian_weight numeric,
+    IN max_speed_bicycle numeric, IN max_speed_bicycle_weight numeric,
+    IN max_speed_pedestrian numeric, IN max_speed_pedestrian_weight numeric,
+    IN parking varchar, IN parking_weight numeric,
+    IN pavement varchar, IN pavement_weight numeric,
+    IN width numeric, IN width_weight numeric,
+    IN gradient_bicycle numeric, IN gradient_bicycle_weight numeric,
+    IN gradient_pedestrian numeric, IN gradient_pedestrian_weight numeric,
+    IN number_lanes numeric, IN number_lanes_weight numeric,
+    IN facilities numeric, IN facilities_weight numeric,
+    IN crossings numeric, IN crossings_weight numeric,
+    IN buildings numeric, IN buildings_weight numeric,
+    IN greenness numeric, IN greenness_weight numeric,
+    IN water boolean, IN water_weight numeric,
+    IN noise numeric, IN noise_weight numeric,
+    OUT index numeric,
+    OUT index_rating numeric,
+    OUT indicators_rating indicators_rating[]
 )
-RETURNS numeric AS $$
+RETURNS SETOF record AS $$
 	DECLARE
+	    weights_total numeric;
 		weights_sum numeric;
 	    indicator numeric;
 	    weight numeric;
 		index numeric;
 	    count integer;
+	    index_rating numeric;
+	    indicators_rating indicators_rating[];
 	BEGIN
 		-- TODO: Gewichte anpassen: pavement/gradient
 	    IF pavement IN ('gravel', 'soft', 'cobble') AND pavement_weight IS NOT NULL AND
@@ -37,8 +49,33 @@ RETURNS numeric AS $$
 		-- TODO: Index anpassen: pedestrian_infrastructure/road_category
 		IF pedestrian_infrastructure IN ('sidewalk') AND pedestrian_infrastructure_weight IS NOT NULL AND
 		   road_category_pedestrian IN ('secondary', 'primary') AND road_category_pedestrian_weight IS NOT NULL THEN
-		    RETURN 0.8::numeric;
+		    RETURN QUERY
+		        SELECT 0.8::numeric AS index,
+		               NULL::numeric AS index_rating,
+		               NULL::indicators_rating[] AS indicator_rating;
         END IF;
+
+		weights_total := 0;
+		weights_total :=
+			CASE WHEN bicycle_infrastructure_weight IS NOT NULL THEN bicycle_infrastructure_weight ELSE 0 END +
+            CASE WHEN pedestrian_infrastructure_weight IS NOT NULL THEN pedestrian_infrastructure_weight ELSE 0 END +
+            CASE WHEN designated_route_weight IS NOT NULL THEN designated_route_weight ELSE 0 END +
+            CASE WHEN road_category_bicycle_weight IS NOT NULL THEN road_category_bicycle_weight ELSE 0 END +
+            CASE WHEN road_category_pedestrian_weight IS NOT NULL THEN road_category_pedestrian_weight ELSE 0 END +
+            CASE WHEN max_speed_bicycle_weight IS NOT NULL THEN max_speed_bicycle_weight ELSE 0 END +
+            CASE WHEN max_speed_pedestrian_weight IS NOT NULL THEN max_speed_pedestrian_weight ELSE 0 END +
+            CASE WHEN parking_weight IS NOT NULL THEN parking_weight ELSE 0 END +
+            CASE WHEN pavement_weight IS NOT NULL THEN pavement_weight ELSE 0 END +
+            CASE WHEN width_weight IS NOT NULL THEN width_weight ELSE 0 END +
+            CASE WHEN gradient_bicycle_weight IS NOT NULL THEN gradient_bicycle_weight ELSE 0 END +
+            CASE WHEN gradient_pedestrian_weight IS NOT NULL THEN gradient_pedestrian_weight ELSE 0 END +
+            CASE WHEN number_lanes_weight IS NOT NULL THEN number_lanes_weight ELSE 0 END +
+            CASE WHEN facilities_weight IS NOT NULL THEN facilities_weight ELSE 0 END +
+            CASE WHEN crossings_weight IS NOT NULL THEN crossings_weight ELSE 0 END +
+            CASE WHEN buildings_weight IS NOT NULL THEN buildings_weight ELSE 0 END +
+            CASE WHEN greenness_weight IS NOT NULL THEN greenness_weight ELSE 0 END +
+            CASE WHEN water_weight IS NOT NULL THEN water_weight ELSE 0 END +
+            CASE WHEN noise_weight IS NOT NULL THEN noise_weight ELSE 0 END;
 
 		weights_sum := 0;
 		weights_sum :=
@@ -80,6 +117,7 @@ RETURNS numeric AS $$
                 weight := bicycle_infrastructure_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('bicycle_infrastructure', indicator * weight)::indicators_rating);
             END IF;
 
             IF pedestrian_infrastructure IS NOT NULL AND pedestrian_infrastructure_weight IS NOT NULL THEN
@@ -95,7 +133,8 @@ RETURNS numeric AS $$
                 weight := pedestrian_infrastructure_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
-			END IF;
+                indicators_rating := array_append(indicators_rating, ('pedestrian_infrastructure', indicator * weight)::indicators_rating);
+            END IF;
 
 			IF designated_route IS NOT NULL AND designated_route_weight IS NOT NULL THEN
 				indicator :=
@@ -110,6 +149,7 @@ RETURNS numeric AS $$
                 weight := designated_route_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('designated_route', indicator * weight)::indicators_rating);
             END IF;
 
 			IF road_category_bicycle IS NOT NULL AND road_category_bicycle_weight IS NOT NULL THEN
@@ -126,6 +166,7 @@ RETURNS numeric AS $$
                 weight := road_category_bicycle_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('road_category_bicycle', indicator * weight)::indicators_rating);
             END IF;
 
 			IF road_category_pedestrian IS NOT NULL AND road_category_pedestrian_weight IS NOT NULL THEN
@@ -142,6 +183,7 @@ RETURNS numeric AS $$
                 weight := road_category_pedestrian_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('road_category_pedestrian', indicator * weight)::indicators_rating);
             END IF;
 
 			IF max_speed_bicycle IS NOT NULL AND max_speed_bicycle_weight IS NOT NULL THEN
@@ -159,6 +201,7 @@ RETURNS numeric AS $$
                 weight := max_speed_bicycle_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('max_speed_bicycle', indicator * weight)::indicators_rating);
             END IF;
 
 			IF max_speed_pedestrian IS NOT NULL AND max_speed_pedestrian_weight IS NOT NULL THEN
@@ -176,6 +219,7 @@ RETURNS numeric AS $$
                 weight := max_speed_pedestrian_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('max_speed_pedestrian', indicator * weight)::indicators_rating);
             END IF;
 
 			IF parking IS NOT NULL AND parking_weight IS NOT NULL THEN
@@ -187,6 +231,7 @@ RETURNS numeric AS $$
                 weight := parking_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('parking', indicator * weight)::indicators_rating);
             END IF;
 
 			IF pavement IS NOT NULL AND pavement_weight IS NOT NULL THEN
@@ -200,6 +245,7 @@ RETURNS numeric AS $$
                 weight := pavement_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('pavement', indicator * weight)::indicators_rating);
 			END IF;
 
 			IF width IS NOT NULL AND width_weight IS NOT NULL THEN
@@ -214,6 +260,7 @@ RETURNS numeric AS $$
                 weight := width_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('width', indicator * weight)::indicators_rating);
             END IF;
 
 			IF gradient_bicycle IS NOT NULL AND gradient_bicycle_weight IS NOT NULL THEN
@@ -232,6 +279,7 @@ RETURNS numeric AS $$
                 weight := gradient_bicycle_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('gradient_bicycle', indicator * weight)::indicators_rating);
             END IF;
 
 			IF gradient_pedestrian IS NOT NULL AND gradient_pedestrian_weight IS NOT NULL THEN
@@ -250,6 +298,7 @@ RETURNS numeric AS $$
                 weight := gradient_pedestrian_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('gradient_pedestrian', indicator * weight)::indicators_rating);
             END IF;
 
 			IF number_lanes IS NOT NULL AND number_lanes_weight IS NOT NULL THEN
@@ -264,6 +313,7 @@ RETURNS numeric AS $$
                 weight := number_lanes_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('number_lanes', indicator * weight)::indicators_rating);
             END IF;
 
 			IF facilities IS NOT NULL AND facilities_weight IS NOT NULL THEN
@@ -275,6 +325,7 @@ RETURNS numeric AS $$
                 weight := facilities_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('facilities', indicator * weight)::indicators_rating);
             END IF;
 
 			IF crossings IS NOT NULL AND crossings_weight IS NOT NULL THEN
@@ -287,6 +338,7 @@ RETURNS numeric AS $$
                 weight := crossings_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('crossings', indicator * weight)::indicators_rating);
             END IF;
 
 			IF buildings IS NOT NULL AND buildings_weight IS NOT NULL THEN
@@ -302,6 +354,7 @@ RETURNS numeric AS $$
                 weight := buildings_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('buildings', indicator * weight)::indicators_rating);
             END IF;
 
 			IF greenness IS NOT NULL AND greenness_weight IS NOT NULL THEN
@@ -316,6 +369,7 @@ RETURNS numeric AS $$
                 weight := greenness_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('greenness', indicator * weight)::indicators_rating);
             END IF;
 
 			IF water IS NOT NULL AND water_weight IS NOT NULL THEN
@@ -327,6 +381,7 @@ RETURNS numeric AS $$
                 weight := water_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('water', indicator * weight)::indicators_rating);
             END IF;
 
 			IF noise IS NOT NULL AND noise_weight IS NOT NULL THEN
@@ -340,10 +395,26 @@ RETURNS numeric AS $$
                 weight := noise_weight / weights_sum;
                 index := index + indicator * weight;
                 count := count + 1;
+                indicators_rating := array_append(indicators_rating, ('noise', indicator * weight)::indicators_rating);
             END IF;
 
         END IF;
 
-		RETURN round(index::numeric, 4);
+		index_rating = weights_sum / weights_total;
+
+		indicators_rating := (
+            WITH a AS (
+                SELECT unnest(indicators_rating)
+                ORDER BY (unnest(indicators_rating)).weight DESC
+                -- LIMIT 1
+            )
+            SELECT array_agg(unnest)
+            FROM a
+        );
+
+		RETURN QUERY
+		    SELECT round(index, 4) AS index,
+		           round(weights_sum / weights_total, 4) AS index_rating,
+		           indicators_rating;
 	END
 $$ LANGUAGE plpgsql;

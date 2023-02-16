@@ -319,6 +319,23 @@ DROP TABLE network_edge_attributes;
 ALTER TABLE network_edge_attributes_tmp RENAME TO network_edge_attributes;
 
 -- ---------------------------------------------------------------------------------------------------------------------
+-- calculate attribute "stairs"
+-- ---------------------------------------------------------------------------------------------------------------------
+
+ALTER TABLE network_edge_attributes DROP COLUMN IF EXISTS stairs;
+
+DROP TABLE IF EXISTS network_edge_attributes_tmp;
+CREATE TABLE network_edge_attributes_tmp AS (
+    SELECT a.*,
+           CASE WHEN highway = 'steps' THEN true ELSE false END::boolean AS stairs
+    FROM network_edge_attributes a
+        LEFT JOIN network_edge b USING (edge_id)
+);
+
+DROP TABLE network_edge_attributes;
+ALTER TABLE network_edge_attributes_tmp RENAME TO network_edge_attributes;
+
+-- ---------------------------------------------------------------------------------------------------------------------
 -- calculate indicator "bicycle_infrastructure"
 -- ---------------------------------------------------------------------------------------------------------------------
 
@@ -1010,6 +1027,7 @@ ALTER TABLE network_edge_attributes
     ADD COLUMN IF NOT EXISTS access_pedestrian_bkw boolean,
     ADD COLUMN IF NOT EXISTS bridge boolean,
     ADD COLUMN IF NOT EXISTS tunnel boolean,
+    ADD COLUMN IF NOT EXISTS stairs boolean,
     ADD COLUMN IF NOT EXISTS bicycle_infrastructure_ft varchar,
     ADD COLUMN IF NOT EXISTS bicycle_infrastructure_tf varchar,
     ADD COLUMN IF NOT EXISTS pedestrian_infrastructure_ft varchar,
@@ -1049,7 +1067,7 @@ ALTER TABLE network_node_attributes ADD PRIMARY KEY (node_id);
 
 DROP TABLE IF EXISTS network_edge_export;
 CREATE TABLE network_edge_export AS ( -- 18 s, 3.875.173
-    SELECT edge_id, osm_id, from_node, to_node, geom
+    SELECT edge_id, osm_id, from_node, to_node, geom, length
     FROM network_edge
 );
 
